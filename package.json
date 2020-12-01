@@ -1,0 +1,63 @@
+{
+  "name": "dm-display-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "lib/server/server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node ./lib/server.js | pino-pretty --ignore req,res,responseTime,unthinkHandlerError,err --messageFormat=\"{msg} {unthinkHandlerError}\"",
+    "watch-server": "./node_modules/.bin/tsc -w --project src/tsconfig.json",
+    "lint": "npm run lint-server",
+    "lint-server": "./node_modules/.bin/eslint \"src/**/*.{js,ts}\" --quiet --fix",
+    "lint-server-fail": "./node_modules/.bin/eslint \"src/**/*.{js,ts}\" --quiet",
+    "clean-build": "./node_modules/.bin/shx rm -rf ./lib",
+    "build": "npm run clean-build && npm run build-server",
+    "build-server": "./node_modules/.bin/tsc --project ./tsconfig.json"
+  },
+  "keywords": [
+    "typescript",
+    "express"
+  ],
+  "author": "Dan Alexander",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.2",
+    "@types/dotenv": "^8.2.0",
+    "@types/eslint": "^7.2.5",
+    "@types/express": "^4.17.9",
+    "@types/jsonwebtoken": "^8.5.0",
+    "@types/nanoid": "^2.1.0",
+    "@types/node": "^12.19.8",
+    "@types/ws": "^7.4.0",
+    "@typescript-eslint/eslint-plugin": "^3.10.1",
+    "@typescript-eslint/parser": "^3.10.1",
+    "concurrently": "^5.3.0",
+    "eslint": "^7.14.0",
+    "onchange": "^7.1.0",
+    "pino-pretty": "^4.3.0",
+    "pre-commit": "^1.2.2",
+    "shx": "^0.3.3",
+    "typescript": "^3.9.7"
+  },
+  "dependencies": {
+    "@epandco/unthink-foundation": "^2.1.0",
+    "@epandco/unthink-foundation-express": "^2.0.1",
+    "body-parser": "^1.19.0",
+    "cookie-parser": "^1.4.5",
+    "dotenv": "^8.2.0",
+    "express": "^4.17.1",
+    "nanoid": "^3.1.20",
+    "ws": "^7.4.0"
+  },
+  "pre-commit": {
+    "run": [
+      "lint-server-fail"
+    ],
+    "silent": true
+  },
+  "unthink": {
+    "version": "3.0.7"
+  },
+  "contributors": [],
+  "private": true
+}
