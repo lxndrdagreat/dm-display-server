@@ -1,0 +1,6 @@
+
+export enum SocketMessageType {
+  ConnectToSession,
+
+
+}

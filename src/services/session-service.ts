@@ -1,9 +1,7 @@
-import {customAlphabet} from 'nanoid';
-import {SessionSchema} from '../schemas/session.schema';
-import {SessionUserRole, SessionUserSchema} from '../schemas/session-user.schema';
-
-// custom nanoid generator
-const nanoid = customAlphabet('1234567890abcdefghijklmnopqrstuvwxyz', 5);
+import {ActiveScreen, SessionSchema} from '../schemas/session.schema';
+import {accessTokenParts, SessionAccessToken, SessionUserRole, SessionUserSchema} from '../schemas/session-user.schema';
+import {initCombatTrackerState} from '../schemas/combat-tracker.schema';
+import {nextUID} from './uid-service';
 
 // Using an in-memory store for now
 const sessionDb = new Map<string, SessionSchema>();
@@ -11,6 +9,12 @@ const sessionDb = new Map<string, SessionSchema>();
 export class SessionNotFoundError extends Error {
   constructor() {
     super('Session not found.');
+  }
+}
+
+export class SessionRoleDenied extends Error {
+  constructor() {
+    super('Invalid role.');
   }
 }
 
@@ -27,14 +31,16 @@ async function getSessionById(sessionId: string, sessionPassword?: string): Prom
 }
 
 export async function createSession(password: string): Promise<Readonly<SessionSchema>> {
-  const sessionId = nanoid();
+  const sessionId = nextUID();
 
   const session: SessionSchema = {
     id: sessionId,
     // TODO: hash this password
     password: password,
     // TODO: include initial admin user
-    users: []
+    users: [],
+    activeScreen: ActiveScreen.CombatTracker,
+    combatTracker: initCombatTrackerState()
   };
 
   sessionDb.set(sessionId, session);
@@ -50,7 +56,7 @@ export async function removeSession(sessionId: string): Promise<void> {
 export async function joinSession(sessionId: string, sessionPassword: string, role: SessionUserRole): Promise<Readonly<SessionUserSchema>> {
   const session = await getSessionById(sessionId, sessionPassword);
   const user: SessionUserSchema = {
-    id: nanoid(),
+    id: nextUID(),
     role: role
   };
   session.users.push(user);
@@ -66,4 +72,32 @@ export async function getUserForSession(userId: string, sessionId: string): Prom
   return session.users[userIndex];
 }
 
+export async function getSessionForUser(sessionId: string, userId: string): Promise<Readonly<SessionSchema>> {
+  const session = await getSessionById(sessionId);
 
+  if (!session.users.find(user => user.id === userId)) {
+    throw new SessionNotFoundError();
+  }
+
+  return session;
+}
+
+export async function getSessionByToken(accessToken: SessionAccessToken, requireRole?: SessionUserRole): Promise<Readonly<SessionSchema>> {
+  const tokenParts = accessTokenParts(accessToken);
+  if (requireRole !== undefined) {
+    if (tokenParts.userRole !== requireRole) {
+      throw new SessionRoleDenied();
+    }
+  }
+  return await getSessionForUser(tokenParts.sessionId, tokenParts.userId);
+}
+
+export async function updateSession(accessToken: SessionAccessToken, update: Partial<SessionSchema>): Promise<Readonly<SessionSchema>> {
+  const session = await getSessionByToken(accessToken, SessionUserRole.Admin);
+  const updatedSession = {
+    ...session,
+    ...update
+  };
+  sessionDb.set(session.id, updatedSession);
+  return updatedSession;
+}
