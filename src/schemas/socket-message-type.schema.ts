@@ -1,7 +1,11 @@
 
 export enum SocketMessageType {
+  CreateNewSession,
+  NewSessionCreated,
+
   ConnectToSession,
   SessionConnected,
+  SessionConnectionRefused,
 
   FullState,
 
