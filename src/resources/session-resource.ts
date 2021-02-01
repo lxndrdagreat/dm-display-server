@@ -1,9 +1,7 @@
-import {unthinkResource, data, DataResult, RouteContext} from '@epandco/unthink-foundation';
-import {createSession, getSessionByToken, joinSession} from '../services/session-service';
-import {AddCharacterRequest} from '../schemas/combat-character.schema';
-import {addCharacter} from '../services/combat-tracker-service';
+// import {unthinkResource, data, DataResult, RouteContext} from '@epandco/unthink-foundation';
+// import {AddCharacterRequest} from '../schemas/combat-character.schema';
 
-
+/*
 export default unthinkResource({
   name: 'Not Found',
   basePath: '/session',
@@ -96,3 +94,4 @@ export default unthinkResource({
     })
   ]
 });
+*/

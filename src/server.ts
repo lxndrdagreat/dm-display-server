@@ -7,6 +7,7 @@ import { UnthinkExpressGenerator } from '@epandco/unthink-foundation-express';
 import { UnthinkGenerator } from '@epandco/unthink-foundation';
 import resourceDefinitions from './resource-definitions';
 import {createSocketServer} from './socket-server';
+import {SessionService} from './services/session.service';
 
 const app: express.Application = express();
 app.use(cookieParser());
@@ -38,4 +39,7 @@ if (!config.isProduction) {
   server = app.listen(config.expressServerPort);
 }
 
-createSocketServer(server);
+// init session service
+const sessionService = new SessionService();
+
+createSocketServer(server, sessionService);

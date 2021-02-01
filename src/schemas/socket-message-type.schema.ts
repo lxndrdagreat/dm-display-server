@@ -15,7 +15,11 @@ export enum SocketMessageType {
   CombatTrackerRemoveCharacter,
   CombatTrackerCharacterRemoved,
   CombatTrackerUpdateCharacter,
-  CombatTrackerCharacterUpdated
+  CombatTrackerCharacterUpdated,
+  CombatTrackerNextTurn,
+  CombatTrackerPreviousTurn,
+  CombatTrackerActiveCharacter,
+  CombatTrackerRound
 }
 
 export interface SocketMessage {
