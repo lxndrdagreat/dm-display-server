@@ -10,7 +10,7 @@ import {
   SessionUserRole
 } from './schemas/session-user.schema';
 import {CombatCharacterSchema} from './schemas/combat-character.schema';
-import {addCharacter} from './services/combat-tracker-service';
+import {addCharacter, removeCharacter, updateCharacter} from './services/combat-tracker-service';
 
 const socketToToken = new Map<WebSocket, string>();
 const tokenToSocket = new Map<string, WebSocket>();
@@ -110,6 +110,29 @@ async function handleAddCharacterToCombat(socket: WebSocket, characterData: Omit
   });
 }
 
+async function handleUpdateCharacter(socket: WebSocket, characterData: Partial<CombatCharacterSchema>): Promise<void> {
+  const info = await validateSocketRole(socket, SessionUserRole.Admin);
+  if (characterData.id) {
+    const updatedCharacter = await updateCharacter(info.token, characterData.id, characterData);
+    await sendToSession(
+      info.tokenParts.sessionId,
+      {
+        type: SocketMessageType.CombatTrackerCharacterUpdated,
+        payload: updatedCharacter
+      }
+    );
+  }
+}
+
+async function handleRemoveCharacter(socket: WebSocket, characterId: string): Promise<void> {
+  const info = await validateSocketRole(socket, SessionUserRole.Admin);
+  await removeCharacter(info.token, characterId);
+  await sendToSession(info.tokenParts.sessionId, {
+    type: SocketMessageType.CombatTrackerCharacterRemoved,
+    payload: characterId
+  });
+}
+
 async function handleSocketMessage(socket: WebSocket, data: WebSocket.Data): Promise<void> {
   if (typeof data === 'string') {
     try {
@@ -127,11 +150,11 @@ async function handleSocketMessage(socket: WebSocket, data: WebSocket.Data): Pro
           case SocketMessageType.CombatTrackerAddCharacter:
             await handleAddCharacterToCombat(socket, parsed.payload as Omit<CombatCharacterSchema, 'id'>);
             break;
-          case SocketMessageType.CombatTrackerCharacterRemoved:
-            // TODO: handle character removal
+          case SocketMessageType.CombatTrackerRemoveCharacter:
+            await handleRemoveCharacter(socket, parsed.payload as string);
             break;
-          case SocketMessageType.CombatTrackerCharacterUpdated:
-            // TODO: handle character updated
+          case SocketMessageType.CombatTrackerUpdateCharacter:
+            await handleUpdateCharacter(socket, parsed.payload as Partial<CombatCharacterSchema>);
             break;
           default:
             break;

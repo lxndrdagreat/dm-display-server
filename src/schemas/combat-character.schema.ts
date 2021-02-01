@@ -13,7 +13,7 @@ export interface CombatCharacterSchema {
   nameVisible: boolean;
   active: boolean;
   roll: number;
-  npc?: NPCDetails;
+  npc: NPCDetails | null;
 }
 
 export interface AddCharacterRequest {
