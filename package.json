@@ -5,7 +5,7 @@
   "main": "lib/server/server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node ./lib/server.js | pino-pretty --ignore req,res,responseTime,unthinkHandlerError,err --messageFormat=\"{msg} {unthinkHandlerError}\"",
+    "start": "node ./lib/server.js",
     "watch-server": "./node_modules/.bin/tsc -w --project src/tsconfig.json",
     "lint": "npm run lint-server",
     "lint-server": "./node_modules/.bin/eslint \"src/**/*.{js,ts}\" --quiet --fix",
