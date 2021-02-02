@@ -179,18 +179,22 @@ export class SessionService {
       return tracker;
     }
     const characters = tracker.characters.slice();
-    // sort by initiative roll
-    characters.sort(((a, b) => a.roll - b.roll));
+    // sort by initiative roll high-to-low
+    characters.sort(((a, b) => b.roll - a.roll));
+
+    // no active character, so start with the 1st one
     if (!tracker.activeCharacterId) {
       this.broadcast({
         sessionId: accessTokenParts(accessToken).sessionId,
         type: 'COMBAT_TRACKER_ACTIVE_CHARACTER',
         payload: characters[0].id
       });
+
       return await this.updateCombatTracker(accessToken, {
         activeCharacterId: characters[0].id
       });
     }
+
     let activeCharacterIndex = characters.findIndex(character => character.id === tracker.activeCharacterId);
     let newRound = false;
     activeCharacterIndex += 1;
