@@ -230,7 +230,7 @@ export class SessionService {
     }
     const characters = tracker.characters.slice();
     // sort by initiative roll
-    characters.sort(((a, b) => a.roll - b.roll));
+    characters.sort(((a, b) => b.roll - a.roll));
     if (!tracker.activeCharacterId) {
       return await this.updateCombatTracker(accessToken, {
         activeCharacterId: characters[0].id
@@ -288,7 +288,7 @@ export class SessionService {
 
     const characters = tracker.characters.slice();
     characters.push(newCharacter);
-    characters.sort(((a, b) => a.roll - b.roll));
+    characters.sort(((a, b) => b.roll - a.roll));
 
     // TODO: if that was the 1st character added, make them the active character
 

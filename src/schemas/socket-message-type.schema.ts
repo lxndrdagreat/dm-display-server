@@ -22,6 +22,11 @@ export enum SocketMessageType {
   CombatTrackerRound
 }
 
+export enum SessionConnectionRefusedReason {
+  SessionNotFound,
+  InvalidPermissions
+}
+
 export interface SocketMessage {
   type: SocketMessageType;
   payload?: unknown;

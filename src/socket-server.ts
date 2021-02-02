@@ -1,7 +1,7 @@
 import * as WebSocket from 'ws';
 import {Server} from 'http';
 import {Server as HttpsServer} from 'https';
-import {SocketMessage, SocketMessageType} from './schemas/socket-message-type.schema';
+import {SessionConnectionRefusedReason, SocketMessage, SocketMessageType} from './schemas/socket-message-type.schema';
 import {
   accessTokenParts,
   createAccessToken,
@@ -178,6 +178,10 @@ async function handleSocketMessage(socket: WebSocket, data: WebSocket.Data, sess
               }
             }
           }
+          await send(socket, {
+            type: SocketMessageType.SessionConnectionRefused,
+            payload: (e instanceof SocketPermissionDenied) ? SessionConnectionRefusedReason.InvalidPermissions : SessionConnectionRefusedReason.SessionNotFound
+          });
           socket.close();
         } else {
           console.error(e);
