@@ -167,8 +167,12 @@ export class SessionService {
   }
 
   async resetCombatRounds(accessToken: SessionAccessToken): Promise<Readonly<CombatTrackerSchema>> {
+    const tracker = await this.getCombatTrackerForSession(accessToken);
+    const characters = tracker.characters.slice();
+    characters.sort((a, b) => b.roll - a.roll);
     return await this.updateCombatTracker(accessToken, {
-      round: 0
+      round: 0,
+      activeCharacterId: characters.length > 0 ? characters[0].id : null
     });
   }
 

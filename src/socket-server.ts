@@ -127,6 +127,11 @@ async function handlePreviousTurn(socket: WebSocket, sessionService: SessionServ
   await sessionService.previousTurn(info.token);
 }
 
+async function handleCombatTrackerReset(socket: WebSocket, sessionService: SessionService): Promise<void> {
+  const info = await validateSocketRole(socket, SessionUserRole.Admin);
+  await sessionService.resetCombatTracker(info.token);
+}
+
 async function handleSocketMessage(socket: WebSocket, data: WebSocket.Data, sessionService: SessionService): Promise<void> {
   if (typeof data === 'string') {
     try {
@@ -155,6 +160,9 @@ async function handleSocketMessage(socket: WebSocket, data: WebSocket.Data, sess
             break;
           case SocketMessageType.CombatTrackerPreviousTurn:
             await handlePreviousTurn(socket, sessionService);
+            break;
+          case SocketMessageType.CombatTrackerRequestReset:
+            await handleCombatTrackerReset(socket, sessionService);
             break;
           default:
             break;
