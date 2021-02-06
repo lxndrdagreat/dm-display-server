@@ -20,7 +20,8 @@ export enum SocketMessageType {
   CombatTrackerPreviousTurn,
   CombatTrackerActiveCharacter,
   CombatTrackerRound,
-  CombatTrackerRequestReset
+  CombatTrackerRequestRestart,
+  CombatTrackerRequestClear
 }
 
 export enum SessionConnectionRefusedReason {

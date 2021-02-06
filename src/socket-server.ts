@@ -21,7 +21,8 @@ class SocketPermissionDenied extends Error {
   }
 }
 
-type ValidatedSocketInfo = {token: string; tokenParts: SessionAccessTokenParts; socket: WebSocket;}
+type ValidatedSocketInfo = { token: string; tokenParts: SessionAccessTokenParts; socket: WebSocket; }
+
 async function validateSocketRole(socket: WebSocket, role: SessionUserRole): Promise<ValidatedSocketInfo> {
   if (!socketToToken.has(socket)) {
     throw new SocketPermissionDenied();
@@ -65,7 +66,7 @@ async function sendToSession(sessionId: string, data: unknown): Promise<void> {
 
 }
 
-async function handleConnectToSession(socket: WebSocket, sessionService: SessionService, payload: Record<string, string|number>): Promise<void> {
+async function handleConnectToSession(socket: WebSocket, sessionService: SessionService, payload: Record<string, string | number>): Promise<void> {
   // TODO: wrap to catch errors
   const user = await sessionService.joinSession(payload.sessionId as string, payload.password as string, payload.role as number);
   const token = createAccessToken(payload.sessionId as string, user.id, user.role);
@@ -127,7 +128,12 @@ async function handlePreviousTurn(socket: WebSocket, sessionService: SessionServ
   await sessionService.previousTurn(info.token);
 }
 
-async function handleCombatTrackerReset(socket: WebSocket, sessionService: SessionService): Promise<void> {
+async function handleCombatTrackerRestart(socket: WebSocket, sessionService: SessionService): Promise<void> {
+  const info = await validateSocketRole(socket, SessionUserRole.Admin);
+  await sessionService.restartCombatRounds(info.token);
+}
+
+async function handleCombatTrackerClear(socket: WebSocket, sessionService: SessionService): Promise<void> {
   const info = await validateSocketRole(socket, SessionUserRole.Admin);
   await sessionService.resetCombatTracker(info.token);
 }
@@ -144,7 +150,7 @@ async function handleSocketMessage(socket: WebSocket, data: WebSocket.Data, sess
             await handleCreateNewSession(socket, sessionService, parsed.payload as string);
             break;
           case SocketMessageType.ConnectToSession:
-            await handleConnectToSession(socket, sessionService, parsed.payload as Record<string, string|number>);
+            await handleConnectToSession(socket, sessionService, parsed.payload as Record<string, string | number>);
             break;
           case SocketMessageType.CombatTrackerAddCharacter:
             await handleAddCharacterToCombat(socket, sessionService, parsed.payload as Omit<CombatCharacterSchema, 'id'>);
@@ -161,8 +167,11 @@ async function handleSocketMessage(socket: WebSocket, data: WebSocket.Data, sess
           case SocketMessageType.CombatTrackerPreviousTurn:
             await handlePreviousTurn(socket, sessionService);
             break;
-          case SocketMessageType.CombatTrackerRequestReset:
-            await handleCombatTrackerReset(socket, sessionService);
+          case SocketMessageType.CombatTrackerRequestRestart:
+            await handleCombatTrackerRestart(socket, sessionService);
+            break;
+          case SocketMessageType.CombatTrackerRequestClear:
+            await handleCombatTrackerClear(socket, sessionService);
             break;
           default:
             break;
@@ -261,6 +270,15 @@ export function createSocketServer(server: Server | HttpsServer, sessionService:
           sessionId,
           {
             type: SocketMessageType.CombatTrackerRound,
+            payload: payload
+          }
+        );
+        break;
+      case 'COMBAT_TRACKER':
+        await sendToSession(
+          sessionId,
+          {
+            type: SocketMessageType.CombatTrackerState,
             payload: payload
           }
         );

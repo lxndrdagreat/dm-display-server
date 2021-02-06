@@ -163,17 +163,32 @@ export class SessionService {
   }
 
   async resetCombatTracker(accessToken: SessionAccessToken): Promise<Readonly<CombatTrackerSchema>> {
-    return await this.updateCombatTracker(accessToken, initCombatTrackerState());
+    const newTracker = await this.updateCombatTracker(accessToken, initCombatTrackerState());
+    this.broadcast({
+      type: 'COMBAT_TRACKER',
+      sessionId: accessTokenParts(accessToken).sessionId,
+      payload: newTracker
+    });
+    return newTracker;
   }
 
-  async resetCombatRounds(accessToken: SessionAccessToken): Promise<Readonly<CombatTrackerSchema>> {
+  async restartCombatRounds(accessToken: SessionAccessToken): Promise<Readonly<CombatTrackerSchema>> {
     const tracker = await this.getCombatTrackerForSession(accessToken);
     const characters = tracker.characters.slice();
     characters.sort((a, b) => b.roll - a.roll);
-    return await this.updateCombatTracker(accessToken, {
-      round: 0,
+
+    const updatedTracker = await this.updateCombatTracker(accessToken, {
+      round: 1,
       activeCharacterId: characters.length > 0 ? characters[0].id : null
     });
+
+    this.broadcast({
+      type: 'COMBAT_TRACKER',
+      sessionId: accessTokenParts(accessToken).sessionId,
+      payload: updatedTracker
+    });
+
+    return updatedTracker;
   }
 
   async nextTurn(accessToken: SessionAccessToken): Promise<Readonly<CombatTrackerSchema>> {
