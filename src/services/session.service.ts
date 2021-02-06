@@ -287,7 +287,8 @@ export class SessionService {
     // TODO: validate character model
     const newCharacter: CombatCharacterSchema = {
       ...character,
-      id: nextUID()
+      id: nextUID(),
+      conditions: []
     };
 
     const characters = tracker.characters.slice();
@@ -318,16 +319,34 @@ export class SessionService {
     const characters = tracker.characters.slice();
     characters.splice(index, 1);
 
-    // TODO: if that character was the active character, set the next active character
-
     this.broadcast({
       sessionId: accessTokenParts(accessToken).sessionId,
       type: 'CHARACTER_REMOVE',
       payload: characterId
     });
 
+    // if that character was the active character, set the next active character
+    let activeCharacter = tracker.activeCharacterId;
+    if (characterId === activeCharacter) {
+      if (index >= characters.length) {
+        if (characters.length > 0) {
+          activeCharacter = characters[0].id;
+        } else {
+          activeCharacter = null;
+        }
+      } else {
+        activeCharacter = characters[index].id;
+      }
+      this.broadcast({
+        sessionId: accessTokenParts(accessToken).sessionId,
+        type: 'COMBAT_TRACKER_ACTIVE_CHARACTER',
+        payload: activeCharacter
+      });
+    }
+
     return await this.updateCombatTracker(accessToken, {
-      characters: characters
+      characters: characters,
+      activeCharacterId: activeCharacter
     });
   }
 }

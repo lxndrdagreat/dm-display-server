@@ -19,7 +19,7 @@ export interface ISessionBroadcast<Type extends SessionBroadcastType, PayloadTyp
 
 export type SessionBroadcast = ISessionBroadcast<'SESSION', SessionSchema>
   | ISessionBroadcast<'COMBAT_TRACKER', CombatTrackerSchema>
-  | ISessionBroadcast<'COMBAT_TRACKER_ACTIVE_CHARACTER', string>
+  | ISessionBroadcast<'COMBAT_TRACKER_ACTIVE_CHARACTER', string | null>
   | ISessionBroadcast<'COMBAT_TRACKER_ROUND', number>
   | ISessionBroadcast<'CHARACTER', CombatCharacterSchema>
   | ISessionBroadcast<'CHARACTER_ADD', CombatCharacterSchema>

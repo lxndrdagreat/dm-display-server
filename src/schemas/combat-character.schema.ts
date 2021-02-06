@@ -6,6 +6,23 @@ export interface NPCDetails {
   url?: string;
 }
 
+export enum CharacterConditions {
+  Blinded,
+  Charmed,
+  Deafened,
+  Frightened,
+  Grappled,
+  Incapacitated,
+  Invisible,
+  Paralyzed,
+  Petrified,
+  Poisoned,
+  Prone,
+  Restrained,
+  Stunned,
+  Unconcious
+}
+
 export interface CombatCharacterSchema {
   id: string;
   displayName: string;
@@ -13,6 +30,7 @@ export interface CombatCharacterSchema {
   nameVisible: boolean;
   active: boolean;
   roll: number;
+  conditions: CharacterConditions[];
   npc: NPCDetails | null;
 }
 
