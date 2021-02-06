@@ -15,7 +15,18 @@ export enum SocketMessageType {
   CombatTrackerRemoveCharacter,
   CombatTrackerCharacterRemoved,
   CombatTrackerUpdateCharacter,
-  CombatTrackerCharacterUpdated
+  CombatTrackerCharacterUpdated,
+  CombatTrackerNextTurn,
+  CombatTrackerPreviousTurn,
+  CombatTrackerActiveCharacter,
+  CombatTrackerRound,
+  CombatTrackerRequestRestart,
+  CombatTrackerRequestClear
+}
+
+export enum SessionConnectionRefusedReason {
+  SessionNotFound,
+  InvalidPermissions
 }
 
 export interface SocketMessage {
