@@ -8,7 +8,7 @@ import {
   SessionAccessTokenParts,
   SessionUserRole
 } from './schemas/session-user.schema';
-import {CombatCharacterSchema} from './schemas/combat-character.schema';
+import {CombatCharacterSchema, NPCDetails} from './schemas/combat-character.schema';
 import {SessionNotFoundError, SessionService} from './services/session.service';
 
 const socketToToken = new Map<WebSocket, string>();
@@ -113,6 +113,11 @@ async function handleUpdateCharacter(socket: WebSocket, sessionService: SessionS
   }
 }
 
+async function handleCombatTrackerUpdateCharacterNPC(socket: WebSocket, sessionService: SessionService, data: {id: string; npc: Partial<NPCDetails>}): Promise<void> {
+  const info = await validateSocketRole(socket, SessionUserRole.Admin);
+  await sessionService.updateCharacterNPCBlock(info.token, data.id, data.npc);
+}
+
 async function handleRemoveCharacter(socket: WebSocket, sessionService: SessionService, characterId: string): Promise<void> {
   const info = await validateSocketRole(socket, SessionUserRole.Admin);
   await sessionService.removeCharacter(info.token, characterId);
@@ -172,6 +177,9 @@ async function handleSocketMessage(socket: WebSocket, data: WebSocket.Data, sess
             break;
           case SocketMessageType.CombatTrackerRequestClear:
             await handleCombatTrackerClear(socket, sessionService);
+            break;
+          case SocketMessageType.CombatTrackerUpdateCharacterNPC:
+            await handleCombatTrackerUpdateCharacterNPC(socket, sessionService, parsed.payload as {id: string; npc: Partial<NPCDetails>});
             break;
           default:
             break;

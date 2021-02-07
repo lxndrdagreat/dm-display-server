@@ -21,7 +21,8 @@ export enum SocketMessageType {
   CombatTrackerActiveCharacter,
   CombatTrackerRound,
   CombatTrackerRequestRestart,
-  CombatTrackerRequestClear
+  CombatTrackerRequestClear,
+  CombatTrackerUpdateCharacterNPC
 }
 
 export enum SessionConnectionRefusedReason {

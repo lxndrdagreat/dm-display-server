@@ -3,7 +3,7 @@ import {ActiveScreen, SessionSchema} from '../schemas/session.schema';
 import {nextUID} from './uid-service';
 import {CombatTrackerSchema, initCombatTrackerState} from '../schemas/combat-tracker.schema';
 import {accessTokenParts, SessionAccessToken, SessionUserRole, SessionUserSchema} from '../schemas/session-user.schema';
-import {CombatCharacterSchema} from '../schemas/combat-character.schema';
+import {CombatCharacterSchema, NPCDetails} from '../schemas/combat-character.schema';
 
 export type SessionBroadcastSubscriberFunction = (message: SessionBroadcast) => void;
 export type UnsubscribeFunction = () => void;
@@ -295,6 +295,28 @@ export class SessionService {
     });
 
     return updatedCharacter;
+  }
+
+  async updateCharacterNPCBlock(accessToken: SessionAccessToken, characterId: string, npcDetails: Partial<NPCDetails>): Promise<Readonly<CombatCharacterSchema>> {
+    const tracker = await this.getCombatTrackerForSession(accessToken);
+    const characterIndex = tracker.characters.findIndex(character => character.id === characterId);
+    if (characterIndex < 0) {
+      throw new CombatCharacterDoesNotExist();
+    }
+    const details: NPCDetails = tracker.characters[characterIndex].npc || {
+      url: '',
+      maxHealth: 0,
+      health: 0,
+      armorClass: 0
+    };
+
+    return this.updateCharacter(accessToken, characterId, {
+      ...tracker.characters[characterIndex],
+      npc: {
+        ...details,
+        ...npcDetails
+      }
+    });
   }
 
   async addCharacter(accessToken: SessionAccessToken, character: Omit<CombatCharacterSchema, 'id'>): Promise<Readonly<CombatCharacterSchema>> {
