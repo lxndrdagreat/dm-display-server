@@ -6,8 +6,8 @@ import * as config from './config/config';
 import { UnthinkExpressGenerator } from '@epandco/unthink-foundation-express';
 import { UnthinkGenerator } from '@epandco/unthink-foundation';
 import resourceDefinitions from './resource-definitions';
-import {createSocketServer} from './socket-server';
-import {SessionService} from './services/session.service';
+import { createSocketServer } from './socket-server';
+import { SessionService } from './services/session.service';
 
 const app: express.Application = express();
 app.use(cookieParser());
@@ -19,7 +19,7 @@ const expressGen = new UnthinkExpressGenerator(
 );
 const unthinkGen = new UnthinkGenerator(expressGen);
 
-resourceDefinitions.forEach(rd => unthinkGen.add(rd));
+resourceDefinitions.forEach((rd) => unthinkGen.add(rd));
 
 unthinkGen.printRouteTable();
 unthinkGen.generate();
@@ -28,13 +28,15 @@ let server;
 
 if (!config.isProduction) {
   // Enable HTTPS for local development
-  server = https.createServer(
-    {
-      key: fs.readFileSync('./certs/localhost.key'),
-      cert: fs.readFileSync('./certs/localhost.crt'),
-    },
-    app
-  ).listen(config.expressServerPort);
+  server = https
+    .createServer(
+      {
+        key: fs.readFileSync('./certs/localhost.key'),
+        cert: fs.readFileSync('./certs/localhost.crt')
+      },
+      app
+    )
+    .listen(config.expressServerPort);
 } else {
   server = app.listen(config.expressServerPort);
 }

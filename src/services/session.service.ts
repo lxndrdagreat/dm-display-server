@@ -1,11 +1,24 @@
-import {SessionBroadcast} from '../schemas/session-broadcast.schema';
-import {ActiveScreen, SessionSchema} from '../schemas/session.schema';
-import {nextUID} from './uid-service';
-import {CombatTrackerSchema, initCombatTrackerState} from '../schemas/combat-tracker.schema';
-import {accessTokenParts, SessionAccessToken, SessionUserRole, SessionUserSchema} from '../schemas/session-user.schema';
-import {CombatCharacterSchema, NPCDetails} from '../schemas/combat-character.schema';
+import { SessionBroadcast } from '../schemas/session-broadcast.schema';
+import { ActiveScreen, SessionSchema } from '../schemas/session.schema';
+import { nextUID } from './uid-service';
+import {
+  CombatTrackerSchema,
+  initCombatTrackerState
+} from '../schemas/combat-tracker.schema';
+import {
+  accessTokenParts,
+  SessionAccessToken,
+  SessionUserRole,
+  SessionUserSchema
+} from '../schemas/session-user.schema';
+import {
+  CombatCharacterSchema,
+  NPCDetails
+} from '../schemas/combat-character.schema';
 
-export type SessionBroadcastSubscriberFunction = (message: SessionBroadcast) => void;
+export type SessionBroadcastSubscriberFunction = (
+  message: SessionBroadcast
+) => void;
 export type UnsubscribeFunction = () => void;
 
 export class SessionNotFoundError extends Error {
@@ -33,7 +46,6 @@ export class CombatCharacterDoesNotExist extends Error {
 }
 
 export class SessionService {
-
   private subscribers: SessionBroadcastSubscriberFunction[] = [];
   // Using an in-memory store for now
   private sessionDb = new Map<string, SessionSchema>();
@@ -59,7 +71,10 @@ export class SessionService {
     }
   }
 
-  private async getSessionById(sessionId: string, sessionPassword?: string): Promise<SessionSchema> {
+  private async getSessionById(
+    sessionId: string,
+    sessionPassword?: string
+  ): Promise<SessionSchema> {
     const session = this.sessionDb.get(sessionId);
     if (!session) {
       throw new SessionNotFoundError();
@@ -93,7 +108,11 @@ export class SessionService {
     this.sessionDb.delete(sessionId);
   }
 
-  async joinSession(sessionId: string, sessionPassword: string, role: SessionUserRole): Promise<Readonly<SessionUserSchema>> {
+  async joinSession(
+    sessionId: string,
+    sessionPassword: string,
+    role: SessionUserRole
+  ): Promise<Readonly<SessionUserSchema>> {
     const session = await this.getSessionById(sessionId, sessionPassword);
     const user: SessionUserSchema = {
       id: nextUID(),
@@ -103,37 +122,55 @@ export class SessionService {
     return user;
   }
 
-  async getUserForSession(userId: string, sessionId: string): Promise<Readonly<SessionUserSchema>> {
+  async getUserForSession(
+    userId: string,
+    sessionId: string
+  ): Promise<Readonly<SessionUserSchema>> {
     const session = await this.getSessionById(sessionId);
-    const userIndex = session.users.findIndex(user => user.id === userId);
+    const userIndex = session.users.findIndex((user) => user.id === userId);
     if (userIndex < 0) {
       throw new SessionNotFoundError();
     }
     return session.users[userIndex];
   }
 
-  async getSessionForUser(sessionId: string, userId: string): Promise<Readonly<SessionSchema>> {
+  async getSessionForUser(
+    sessionId: string,
+    userId: string
+  ): Promise<Readonly<SessionSchema>> {
     const session = await this.getSessionById(sessionId);
 
-    if (!session.users.find(user => user.id === userId)) {
+    if (!session.users.find((user) => user.id === userId)) {
       throw new SessionNotFoundError();
     }
 
     return session;
   }
 
-  async getSessionByToken(accessToken: SessionAccessToken, requireRole?: SessionUserRole): Promise<Readonly<SessionSchema>> {
+  async getSessionByToken(
+    accessToken: SessionAccessToken,
+    requireRole?: SessionUserRole
+  ): Promise<Readonly<SessionSchema>> {
     const tokenParts = accessTokenParts(accessToken);
     if (requireRole !== undefined) {
       if (tokenParts.userRole !== requireRole) {
         throw new SessionRoleDenied();
       }
     }
-    return await this.getSessionForUser(tokenParts.sessionId, tokenParts.userId);
+    return await this.getSessionForUser(
+      tokenParts.sessionId,
+      tokenParts.userId
+    );
   }
 
-  async updateSession(accessToken: SessionAccessToken, update: Partial<SessionSchema>): Promise<Readonly<SessionSchema>> {
-    const session = await this.getSessionByToken(accessToken, SessionUserRole.Admin);
+  async updateSession(
+    accessToken: SessionAccessToken,
+    update: Partial<SessionSchema>
+  ): Promise<Readonly<SessionSchema>> {
+    const session = await this.getSessionByToken(
+      accessToken,
+      SessionUserRole.Admin
+    );
     const updatedSession = {
       ...session,
       ...update
@@ -142,7 +179,9 @@ export class SessionService {
     return updatedSession;
   }
 
-  async getCombatTrackerForSession(accessToken: SessionAccessToken): Promise<Readonly<CombatTrackerSchema>> {
+  async getCombatTrackerForSession(
+    accessToken: SessionAccessToken
+  ): Promise<Readonly<CombatTrackerSchema>> {
     const session = await this.getSessionByToken(accessToken);
     if (!session.combatTracker) {
       throw new CombatTrackerDoesNotExist();
@@ -150,7 +189,10 @@ export class SessionService {
     return session.combatTracker;
   }
 
-  async updateCombatTracker(accessToken: SessionAccessToken, update: Partial<CombatTrackerSchema>): Promise<Readonly<CombatTrackerSchema>> {
+  async updateCombatTracker(
+    accessToken: SessionAccessToken,
+    update: Partial<CombatTrackerSchema>
+  ): Promise<Readonly<CombatTrackerSchema>> {
     const tracker = await this.getCombatTrackerForSession(accessToken);
     const updatedTracker = {
       ...tracker,
@@ -162,8 +204,13 @@ export class SessionService {
     return updatedTracker;
   }
 
-  async resetCombatTracker(accessToken: SessionAccessToken): Promise<Readonly<CombatTrackerSchema>> {
-    const newTracker = await this.updateCombatTracker(accessToken, initCombatTrackerState());
+  async resetCombatTracker(
+    accessToken: SessionAccessToken
+  ): Promise<Readonly<CombatTrackerSchema>> {
+    const newTracker = await this.updateCombatTracker(
+      accessToken,
+      initCombatTrackerState()
+    );
     this.broadcast({
       type: 'COMBAT_TRACKER',
       sessionId: accessTokenParts(accessToken).sessionId,
@@ -172,7 +219,9 @@ export class SessionService {
     return newTracker;
   }
 
-  async restartCombatRounds(accessToken: SessionAccessToken): Promise<Readonly<CombatTrackerSchema>> {
+  async restartCombatRounds(
+    accessToken: SessionAccessToken
+  ): Promise<Readonly<CombatTrackerSchema>> {
     const tracker = await this.getCombatTrackerForSession(accessToken);
     const characters = tracker.characters.slice();
     characters.sort((a, b) => b.roll - a.roll);
@@ -191,7 +240,9 @@ export class SessionService {
     return updatedTracker;
   }
 
-  async nextTurn(accessToken: SessionAccessToken): Promise<Readonly<CombatTrackerSchema>> {
+  async nextTurn(
+    accessToken: SessionAccessToken
+  ): Promise<Readonly<CombatTrackerSchema>> {
     const tracker = await this.getCombatTrackerForSession(accessToken);
     if (tracker.characters.length === 0) {
       // do nothing
@@ -199,7 +250,7 @@ export class SessionService {
     }
     const characters = tracker.characters.slice();
     // sort by initiative roll high-to-low
-    characters.sort(((a, b) => b.roll - a.roll));
+    characters.sort((a, b) => b.roll - a.roll);
 
     // no active character, so start with the 1st one
     if (!tracker.activeCharacterId) {
@@ -214,7 +265,9 @@ export class SessionService {
       });
     }
 
-    let activeCharacterIndex = characters.findIndex(character => character.id === tracker.activeCharacterId);
+    let activeCharacterIndex = characters.findIndex(
+      (character) => character.id === tracker.activeCharacterId
+    );
     let newRound = false;
     activeCharacterIndex += 1;
     if (activeCharacterIndex >= characters.length) {
@@ -241,7 +294,9 @@ export class SessionService {
     });
   }
 
-  async previousTurn(accessToken: SessionAccessToken): Promise<Readonly<CombatTrackerSchema>> {
+  async previousTurn(
+    accessToken: SessionAccessToken
+  ): Promise<Readonly<CombatTrackerSchema>> {
     const tracker = await this.getCombatTrackerForSession(accessToken);
     if (tracker.characters.length === 0) {
       // do nothing
@@ -249,13 +304,15 @@ export class SessionService {
     }
     const characters = tracker.characters.slice();
     // sort by initiative roll
-    characters.sort(((a, b) => b.roll - a.roll));
+    characters.sort((a, b) => b.roll - a.roll);
     if (!tracker.activeCharacterId) {
       return await this.updateCombatTracker(accessToken, {
         activeCharacterId: characters[0].id
       });
     }
-    let activeCharacterIndex = characters.findIndex(character => character.id === tracker.activeCharacterId);
+    let activeCharacterIndex = characters.findIndex(
+      (character) => character.id === tracker.activeCharacterId
+    );
     let newRound = false;
     activeCharacterIndex -= 1;
     if (activeCharacterIndex < 0) {
@@ -268,9 +325,15 @@ export class SessionService {
     });
   }
 
-  async updateCharacter(accessToken: SessionAccessToken, characterId: string, characterUpdate: Partial<CombatCharacterSchema>): Promise<Readonly<CombatCharacterSchema>> {
+  async updateCharacter(
+    accessToken: SessionAccessToken,
+    characterId: string,
+    characterUpdate: Partial<CombatCharacterSchema>
+  ): Promise<Readonly<CombatCharacterSchema>> {
     const tracker = await this.getCombatTrackerForSession(accessToken);
-    const characterIndex = tracker.characters.findIndex(character => character.id === characterId);
+    const characterIndex = tracker.characters.findIndex(
+      (character) => character.id === characterId
+    );
     if (characterIndex < 0) {
       throw new CombatCharacterDoesNotExist();
     }
@@ -297,9 +360,15 @@ export class SessionService {
     return updatedCharacter;
   }
 
-  async updateCharacterNPCBlock(accessToken: SessionAccessToken, characterId: string, npcDetails: Partial<NPCDetails>): Promise<Readonly<CombatCharacterSchema>> {
+  async updateCharacterNPCBlock(
+    accessToken: SessionAccessToken,
+    characterId: string,
+    npcDetails: Partial<NPCDetails>
+  ): Promise<Readonly<CombatCharacterSchema>> {
     const tracker = await this.getCombatTrackerForSession(accessToken);
-    const characterIndex = tracker.characters.findIndex(character => character.id === characterId);
+    const characterIndex = tracker.characters.findIndex(
+      (character) => character.id === characterId
+    );
     if (characterIndex < 0) {
       throw new CombatCharacterDoesNotExist();
     }
@@ -319,7 +388,10 @@ export class SessionService {
     });
   }
 
-  async addCharacter(accessToken: SessionAccessToken, character: Omit<CombatCharacterSchema, 'id'>): Promise<Readonly<CombatCharacterSchema>> {
+  async addCharacter(
+    accessToken: SessionAccessToken,
+    character: Omit<CombatCharacterSchema, 'id'>
+  ): Promise<Readonly<CombatCharacterSchema>> {
     const tracker = await this.getCombatTrackerForSession(accessToken);
     // TODO: validate character model
     const newCharacter: CombatCharacterSchema = {
@@ -330,7 +402,7 @@ export class SessionService {
 
     const characters = tracker.characters.slice();
     characters.push(newCharacter);
-    characters.sort(((a, b) => b.roll - a.roll));
+    characters.sort((a, b) => b.roll - a.roll);
 
     // TODO: if that was the 1st character added, make them the active character
 
@@ -347,9 +419,14 @@ export class SessionService {
     return newCharacter;
   }
 
-  async removeCharacter(accessToken: SessionAccessToken, characterId: string): Promise<Readonly<CombatTrackerSchema>> {
+  async removeCharacter(
+    accessToken: SessionAccessToken,
+    characterId: string
+  ): Promise<Readonly<CombatTrackerSchema>> {
     const tracker = await this.getCombatTrackerForSession(accessToken);
-    const index = tracker.characters.findIndex(character => character.id === characterId);
+    const index = tracker.characters.findIndex(
+      (character) => character.id === characterId
+    );
     if (index < 0) {
       throw new CombatCharacterDoesNotExist();
     }

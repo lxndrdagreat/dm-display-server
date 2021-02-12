@@ -1,4 +1,3 @@
-
 export interface NPCDetails {
   maxHealth: number;
   health: number;

@@ -1,4 +1,3 @@
-
 export enum SessionUserRole {
   Display,
   Admin,
@@ -17,11 +16,17 @@ export interface SessionAccessTokenParts {
   userRole: SessionUserRole;
 }
 
-export function createAccessToken(sessionId: string, userId: string, userRole: SessionUserRole): SessionAccessToken {
+export function createAccessToken(
+  sessionId: string,
+  userId: string,
+  userRole: SessionUserRole
+): SessionAccessToken {
   return `${sessionId}${userId}${userRole}`;
 }
 
-export function accessTokenParts(accessToken: SessionAccessToken): SessionAccessTokenParts {
+export function accessTokenParts(
+  accessToken: SessionAccessToken
+): SessionAccessTokenParts {
   if (accessToken.length !== 11) {
     throw new Error(`Invalid SessionAccessToken: "${accessToken}".`);
   }

@@ -1,4 +1,3 @@
-
 export enum SocketMessageType {
   CreateNewSession,
   NewSessionCreated,

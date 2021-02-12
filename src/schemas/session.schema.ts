@@ -1,5 +1,5 @@
-import {SessionUserSchema} from './session-user.schema';
-import {CombatTrackerSchema} from './combat-tracker.schema';
+import { SessionUserSchema } from './session-user.schema';
+import { CombatTrackerSchema } from './combat-tracker.schema';
 
 export enum ActiveScreen {
   CombatTracker
