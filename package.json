@@ -6,12 +6,12 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node ./lib/server.js",
-    "watch-server": "./node_modules/.bin/tsc -w --project src/tsconfig.json",
+    "watch-server": "tsc -w --project src/tsconfig.json",
     "lint": "prettier --check \"src/**/*.ts\"",
     "format": "prettier --write \"src/**/*.ts\"",
-    "clean-build": "./node_modules/.bin/shx rm -rf ./lib",
+    "clean-build": "shx rm -rf ./lib",
     "build": "npm run clean-build && npm run build-server",
-    "build-server": "./node_modules/.bin/tsc --project ./tsconfig.json"
+    "build-server": "tsc --project ./tsconfig.json"
   },
   "keywords": [
     "typescript",
