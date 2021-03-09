@@ -3,6 +3,7 @@ export interface NPCDetails {
   health: number;
   armorClass: number;
   url?: string;
+  attacks: { name: string; info: string }[];
 }
 
 export enum CharacterConditions {

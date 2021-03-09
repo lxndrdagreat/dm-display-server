@@ -18,7 +18,7 @@ import {
 
 export type SessionBroadcastSubscriberFunction = (
   message: SessionBroadcast
-) => void;
+) => Promise<void>;
 export type UnsubscribeFunction = () => void;
 
 export class SessionNotFoundError extends Error {
@@ -67,7 +67,9 @@ export class SessionService {
 
   private broadcast(message: SessionBroadcast): void {
     for (const sub of this.subscribers) {
-      sub(message);
+      sub(message).catch((err) => {
+        console.log('Uncaught Error in Broadcast Subscriber:', err);
+      });
     }
   }
 
@@ -376,7 +378,8 @@ export class SessionService {
       url: '',
       maxHealth: 0,
       health: 0,
-      armorClass: 0
+      armorClass: 0,
+      attacks: []
     };
 
     return this.updateCharacter(accessToken, characterId, {
