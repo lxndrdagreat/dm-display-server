@@ -63,7 +63,7 @@ async function send(socket: WebSocket, data: unknown): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     socket.send(JSON.stringify(data), (err?: Error) => {
       if (err) {
-        reject();
+        reject(err);
       } else {
         resolve();
       }
@@ -77,8 +77,12 @@ async function sendToSession(sessionId: string, data: unknown): Promise<void> {
     return;
   }
 
-  for (const socket of sockets) {
-    send(socket, data);
+  for (const socket of sockets.filter(
+    (sock) => sock.readyState === WebSocket.OPEN
+  )) {
+    send(socket, data).catch((err) => {
+      console.log('sendToSession failed:', err);
+    });
   }
 }
 
@@ -318,6 +322,26 @@ async function handleSocketMessage(
   }
 }
 
+async function handleSocketDisconnect(
+  socket: WebSocket,
+  sessionService: SessionService
+): Promise<void> {
+  const token = socketToToken.get(socket);
+  if (!token) {
+    return;
+  }
+  const session = await sessionService.getSessionByToken(token);
+  tokenToSocket.delete(token);
+  socketToToken.delete(socket);
+  let list = socketsBySession.get(session.id);
+  if (list) {
+    const index = list.indexOf(socket);
+    if (index >= 0) {
+      list.splice(index, 1);
+    }
+  }
+}
+
 export function createSocketServer(
   server: Server | HttpsServer,
   sessionService: SessionService
@@ -326,12 +350,17 @@ export function createSocketServer(
 
   wss.on('connection', (ws: WebSocket) => {
     ws.on('message', (data: WebSocket.Data) => {
-      handleSocketMessage(ws, data, sessionService);
+      handleSocketMessage(ws, data, sessionService).catch((err) => {
+        console.error('Error while handling socket message:', err);
+      });
     });
 
     ws.on('close', (code: number, reason: string) => {
       console.log('Connection closed:', code, reason);
-      // TODO: remove references to the socket
+      // remove references to the socket
+      handleSocketDisconnect(ws, sessionService).catch((err) => {
+        console.error('Error removing socket from session:', err);
+      });
     });
   });
 
@@ -340,45 +369,52 @@ export function createSocketServer(
 
     const { sessionId, payload } = message;
 
-    switch (message.type) {
-      case 'CHARACTER_ADD':
-        await sendToSession(sessionId, {
-          type: SocketMessageType.CombatTrackerCharacterAdded,
-          payload: payload
-        });
-        break;
-      case 'CHARACTER_REMOVE':
-        await sendToSession(sessionId, {
-          type: SocketMessageType.CombatTrackerCharacterRemoved,
-          payload: payload
-        });
-        break;
-      case 'CHARACTER':
-        await sendToSession(sessionId, {
-          type: SocketMessageType.CombatTrackerCharacterUpdated,
-          payload: payload
-        });
-        break;
-      case 'COMBAT_TRACKER_ACTIVE_CHARACTER':
-        await sendToSession(sessionId, {
-          type: SocketMessageType.CombatTrackerActiveCharacter,
-          payload: payload
-        });
-        break;
-      case 'COMBAT_TRACKER_ROUND':
-        await sendToSession(sessionId, {
-          type: SocketMessageType.CombatTrackerRound,
-          payload: payload
-        });
-        break;
-      case 'COMBAT_TRACKER':
-        await sendToSession(sessionId, {
-          type: SocketMessageType.CombatTrackerState,
-          payload: payload
-        });
-        break;
-      default:
-        break;
+    try {
+      switch (message.type) {
+        case 'CHARACTER_ADD':
+          await sendToSession(sessionId, {
+            type: SocketMessageType.CombatTrackerCharacterAdded,
+            payload: payload
+          });
+          break;
+        case 'CHARACTER_REMOVE':
+          await sendToSession(sessionId, {
+            type: SocketMessageType.CombatTrackerCharacterRemoved,
+            payload: payload
+          });
+          break;
+        case 'CHARACTER':
+          await sendToSession(sessionId, {
+            type: SocketMessageType.CombatTrackerCharacterUpdated,
+            payload: payload
+          });
+          break;
+        case 'COMBAT_TRACKER_ACTIVE_CHARACTER':
+          await sendToSession(sessionId, {
+            type: SocketMessageType.CombatTrackerActiveCharacter,
+            payload: payload
+          });
+          break;
+        case 'COMBAT_TRACKER_ROUND':
+          await sendToSession(sessionId, {
+            type: SocketMessageType.CombatTrackerRound,
+            payload: payload
+          });
+          break;
+        case 'COMBAT_TRACKER':
+          await sendToSession(sessionId, {
+            type: SocketMessageType.CombatTrackerState,
+            payload: payload
+          });
+          break;
+        default:
+          break;
+      }
+    } catch (e) {
+      console.error(
+        `Error while handling session broadcast of type "${message.type}":`,
+        e
+      );
     }
   });
 
