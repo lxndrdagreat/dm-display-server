@@ -81,7 +81,7 @@ async function sendToSession(sessionId: string, data: unknown): Promise<void> {
     (sock) => sock.readyState === WebSocket.OPEN
   )) {
     send(socket, data).catch((err) => {
-      console.log('sendToSession failed:', err);
+      console.error('sendToSession failed:', err);
     });
   }
 }
@@ -130,7 +130,6 @@ async function handleCreateNewSession(
 ): Promise<void> {
   // todo validate password
   const session = await sessionService.createSession(password);
-  console.info('Created new session:', session.id);
   await send(socket, {
     type: SocketMessageType.NewSessionCreated,
     payload: session.id
@@ -219,7 +218,6 @@ async function handleSocketMessage(
   if (typeof data === 'string') {
     try {
       const parsed = JSON.parse(data) as SocketMessage;
-      console.log(parsed.type, parsed.payload);
 
       try {
         switch (parsed.type) {
@@ -355,8 +353,7 @@ export function createSocketServer(
       });
     });
 
-    ws.on('close', (code: number, reason: string) => {
-      console.log('Connection closed:', code, reason);
+    ws.on('close', (_code: number, _reason: string) => {
       // remove references to the socket
       handleSocketDisconnect(ws, sessionService).catch((err) => {
         console.error('Error removing socket from session:', err);
@@ -365,8 +362,6 @@ export function createSocketServer(
   });
 
   sessionService.subscribe(async (message) => {
-    console.log({ message });
-
     const { sessionId, payload } = message;
 
     try {
