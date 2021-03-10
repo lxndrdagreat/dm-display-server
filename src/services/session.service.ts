@@ -165,7 +165,7 @@ export class SessionService {
     );
   }
 
-  async updateSession(
+  private async updateSession(
     accessToken: SessionAccessToken,
     update: Partial<SessionSchema>
   ): Promise<Readonly<SessionSchema>> {
@@ -191,7 +191,7 @@ export class SessionService {
     return session.combatTracker;
   }
 
-  async updateCombatTracker(
+  private async updateCombatTracker(
     accessToken: SessionAccessToken,
     update: Partial<CombatTrackerSchema>
   ): Promise<Readonly<CombatTrackerSchema>> {
@@ -207,11 +207,12 @@ export class SessionService {
   }
 
   async resetCombatTracker(
-    accessToken: SessionAccessToken
+    accessToken: SessionAccessToken,
+    state?: CombatTrackerSchema
   ): Promise<Readonly<CombatTrackerSchema>> {
     const newTracker = await this.updateCombatTracker(
       accessToken,
-      initCombatTrackerState()
+      state ?? initCombatTrackerState()
     );
     this.broadcast({
       type: 'COMBAT_TRACKER',

@@ -20,6 +20,7 @@ import {
   SessionNotFoundError,
   SessionService
 } from './services/session.service';
+import { CombatTrackerSchema } from './schemas/combat-tracker.schema';
 
 const socketToToken = new Map<WebSocket, string>();
 const tokenToSocket = new Map<string, WebSocket>();
@@ -141,8 +142,8 @@ async function handleAddCharacterToCombat(
   sessionService: SessionService,
   characterData: Omit<CombatCharacterSchema, 'id'>
 ): Promise<void> {
-  const info = await validateSocketRole(socket, SessionUserRole.Admin);
-  await sessionService.addCharacter(info.token, characterData);
+  const { token } = await validateSocketRole(socket, SessionUserRole.Admin);
+  await sessionService.addCharacter(token, characterData);
 }
 
 async function handleUpdateCharacter(
@@ -150,10 +151,10 @@ async function handleUpdateCharacter(
   sessionService: SessionService,
   characterData: Partial<CombatCharacterSchema>
 ): Promise<void> {
-  const info = await validateSocketRole(socket, SessionUserRole.Admin);
+  const { token } = await validateSocketRole(socket, SessionUserRole.Admin);
   if (characterData.id) {
     await sessionService.updateCharacter(
-      info.token,
+      token,
       characterData.id,
       characterData
     );
@@ -165,8 +166,8 @@ async function handleCombatTrackerUpdateCharacterNPC(
   sessionService: SessionService,
   data: { id: string; npc: Partial<NPCDetails> }
 ): Promise<void> {
-  const info = await validateSocketRole(socket, SessionUserRole.Admin);
-  await sessionService.updateCharacterNPCBlock(info.token, data.id, data.npc);
+  const { token } = await validateSocketRole(socket, SessionUserRole.Admin);
+  await sessionService.updateCharacterNPCBlock(token, data.id, data.npc);
 }
 
 async function handleRemoveCharacter(
@@ -174,40 +175,49 @@ async function handleRemoveCharacter(
   sessionService: SessionService,
   characterId: string
 ): Promise<void> {
-  const info = await validateSocketRole(socket, SessionUserRole.Admin);
-  await sessionService.removeCharacter(info.token, characterId);
+  const { token } = await validateSocketRole(socket, SessionUserRole.Admin);
+  await sessionService.removeCharacter(token, characterId);
 }
 
 async function handleNextTurn(
   socket: WebSocket,
   sessionService: SessionService
 ): Promise<void> {
-  const info = await validateSocketRole(socket, SessionUserRole.Admin);
-  await sessionService.nextTurn(info.token);
+  const { token } = await validateSocketRole(socket, SessionUserRole.Admin);
+  await sessionService.nextTurn(token);
 }
 
 async function handlePreviousTurn(
   socket: WebSocket,
   sessionService: SessionService
 ): Promise<void> {
-  const info = await validateSocketRole(socket, SessionUserRole.Admin);
-  await sessionService.previousTurn(info.token);
+  const { token } = await validateSocketRole(socket, SessionUserRole.Admin);
+  await sessionService.previousTurn(token);
 }
 
 async function handleCombatTrackerRestart(
   socket: WebSocket,
   sessionService: SessionService
 ): Promise<void> {
-  const info = await validateSocketRole(socket, SessionUserRole.Admin);
-  await sessionService.restartCombatRounds(info.token);
+  const { token } = await validateSocketRole(socket, SessionUserRole.Admin);
+  await sessionService.restartCombatRounds(token);
 }
 
 async function handleCombatTrackerClear(
   socket: WebSocket,
   sessionService: SessionService
 ): Promise<void> {
-  const info = await validateSocketRole(socket, SessionUserRole.Admin);
-  await sessionService.resetCombatTracker(info.token);
+  const { token } = await validateSocketRole(socket, SessionUserRole.Admin);
+  await sessionService.resetCombatTracker(token);
+}
+
+async function handleCombatTrackerStateSet(
+  socket: WebSocket,
+  sessionService: SessionService,
+  state: CombatTrackerSchema
+): Promise<void> {
+  const { token } = await validateSocketRole(socket, SessionUserRole.Admin);
+  await sessionService.resetCombatTracker(token, state);
 }
 
 async function handleSocketMessage(
@@ -273,6 +283,13 @@ async function handleSocketMessage(
               socket,
               sessionService,
               parsed.payload as { id: string; npc: Partial<NPCDetails> }
+            );
+            break;
+          case SocketMessageType.CombatTrackerState:
+            await handleCombatTrackerStateSet(
+              socket,
+              sessionService,
+              parsed.payload as CombatTrackerSchema
             );
             break;
           default:
