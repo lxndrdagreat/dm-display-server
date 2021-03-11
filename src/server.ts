@@ -1,30 +1,24 @@
-import * as express from 'express';
-import * as cookieParser from 'cookie-parser';
-import * as config from './config/config';
-import { UnthinkExpressGenerator } from '@epandco/unthink-foundation-express';
-import { UnthinkGenerator } from '@epandco/unthink-foundation';
-import resourceDefinitions from './resource-definitions';
 import { createSocketServer } from './socket-server';
 import { SessionService } from './services/session.service';
+import fastify from 'fastify';
+import config from './config';
+import statsResource from './resources/stats.resource';
 
-const app: express.Application = express();
-app.use(cookieParser());
-
-const expressGen = new UnthinkExpressGenerator(
-  app,
-  (): string => '',
-  config.logLevel
-);
-const unthinkGen = new UnthinkGenerator(expressGen);
-
-resourceDefinitions.forEach((rd) => unthinkGen.add(rd));
-
-unthinkGen.printRouteTable();
-unthinkGen.generate();
-
-const server = app.listen(config.expressServerPort);
+const server = fastify({ logger: { level: config.logLevel } });
 
 // init session service
 const sessionService = new SessionService();
 
-createSocketServer(server, sessionService);
+// init socket server
+createSocketServer(server.server, sessionService);
+
+// init routes
+statsResource(server);
+
+server.listen(config.serverPort, (err, address) => {
+  if (err) {
+    server.log.error(err);
+    process.exit(1);
+  }
+  server.log.info(`DM Display Server listening at ${address}.`);
+});
