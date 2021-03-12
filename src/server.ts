@@ -15,10 +15,14 @@ createSocketServer(server.server, sessionService);
 // init routes
 statsResource(server);
 
-server.listen(config.serverPort, (err, address) => {
-  if (err) {
+const start = async () => {
+  try {
+    const address = await server.listen(config.serverPort, '0.0.0.0');
+    server.log.info(`DM Display Server listening at ${address}.`);
+  } catch (err) {
     server.log.error(err);
     process.exit(1);
   }
-  server.log.info(`DM Display Server listening at ${address}.`);
-});
+};
+
+start();
