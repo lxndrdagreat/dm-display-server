@@ -40,7 +40,7 @@ type ValidatedSocketInfo = {
 
 async function validateSocketRole(
   socket: WebSocket,
-  role: SessionUserRole
+  role?: SessionUserRole
 ): Promise<ValidatedSocketInfo> {
   if (!socketToToken.has(socket)) {
     throw new SocketPermissionDenied();
@@ -50,7 +50,7 @@ async function validateSocketRole(
     throw new SocketPermissionDenied();
   }
   const parsed = accessTokenParts(token);
-  if (parsed.userRole !== role) {
+  if (role !== undefined && parsed.userRole !== role) {
     throw new SocketPermissionDenied();
   }
   return {
@@ -220,6 +220,13 @@ async function handleCombatTrackerStateSet(
   await sessionService.resetCombatTracker(token, state);
 }
 
+async function handleClientHeartbeat(socket: WebSocket): Promise<void> {
+  await validateSocketRole(socket);
+  await send(socket, {
+    type: SocketMessageType.Heartbeat
+  });
+}
+
 async function handleSocketMessage(
   socket: WebSocket,
   data: WebSocket.Data,
@@ -291,6 +298,9 @@ async function handleSocketMessage(
               sessionService,
               parsed.payload as CombatTrackerSchema
             );
+            break;
+          case SocketMessageType.Heartbeat:
+            await handleClientHeartbeat(socket);
             break;
           default:
             break;
