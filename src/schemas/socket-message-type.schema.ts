@@ -5,6 +5,7 @@ export enum SocketMessageType {
   ConnectToSession,
   SessionConnected,
   SessionConnectionRefused,
+  Reconnect,
 
   Heartbeat,
 
@@ -24,6 +25,13 @@ export enum SocketMessageType {
   CombatTrackerRequestRestart,
   CombatTrackerRequestClear,
   CombatTrackerUpdateCharacterNPC
+}
+
+// https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent#status_codes
+// 4000-4999 are reserved for application use
+export enum SocketCloseStatusCode {
+  SessionNotFound = 4000,
+  InvalidRolePermissions = 4001
 }
 
 export enum SessionConnectionRefusedReason {

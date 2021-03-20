@@ -2,7 +2,7 @@ import * as WebSocket from 'ws';
 import { Server } from 'http';
 import { Server as HttpsServer } from 'https';
 import {
-  SessionConnectionRefusedReason,
+  SocketCloseStatusCode,
   SocketMessage,
   SocketMessageType
 } from './schemas/socket-message-type.schema';
@@ -21,6 +21,7 @@ import {
   SessionService
 } from './services/session.service';
 import { CombatTrackerSchema } from './schemas/combat-tracker.schema';
+import { SessionSchema } from './schemas/session.schema';
 
 const socketToToken = new Map<WebSocket, string>();
 const tokenToSocket = new Map<string, WebSocket>();
@@ -104,6 +105,14 @@ async function handleConnectToSession(
     user.role
   );
   const session = await sessionService.getSessionByToken(token);
+  await connectSocketWithTokenAndSession(socket, token, session);
+}
+
+async function connectSocketWithTokenAndSession(
+  socket: WebSocket,
+  token: string,
+  session: SessionSchema
+): Promise<void> {
   tokenToSocket.set(token, socket);
   socketToToken.set(socket, token);
   const list = socketsBySession.get(session.id) || [];
@@ -122,6 +131,18 @@ async function handleConnectToSession(
       combatTracker: session.combatTracker
     }
   });
+}
+
+async function handleReconnectToSession(
+  socket: WebSocket,
+  sessionService: SessionService,
+  payload: string
+): Promise<void> {
+  if (socketToToken.has(socket) || tokenToSocket.has(payload)) {
+    return;
+  }
+  const session = await sessionService.getSessionByToken(payload);
+  await connectSocketWithTokenAndSession(socket, payload, session);
 }
 
 async function handleCreateNewSession(
@@ -299,6 +320,13 @@ async function handleSocketMessage(
               parsed.payload as CombatTrackerSchema
             );
             break;
+          case SocketMessageType.Reconnect:
+            await handleReconnectToSession(
+              socket,
+              sessionService,
+              parsed.payload as string
+            );
+            break;
           case SocketMessageType.Heartbeat:
             await handleClientHeartbeat(socket);
             break;
@@ -327,14 +355,11 @@ async function handleSocketMessage(
               }
             }
           }
-          await send(socket, {
-            type: SocketMessageType.SessionConnectionRefused,
-            payload:
-              e instanceof SocketPermissionDenied
-                ? SessionConnectionRefusedReason.InvalidPermissions
-                : SessionConnectionRefusedReason.SessionNotFound
-          });
-          socket.close();
+          socket.close(
+            e instanceof SocketPermissionDenied
+              ? SocketCloseStatusCode.InvalidRolePermissions
+              : SocketCloseStatusCode.SessionNotFound
+          );
         } else {
           console.error(e);
         }
