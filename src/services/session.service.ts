@@ -309,6 +309,11 @@ export class SessionService {
     // sort by initiative roll
     characters.sort((a, b) => b.roll - a.roll);
     if (!tracker.activeCharacterId) {
+      this.broadcast({
+        sessionId: accessTokenParts(accessToken).sessionId,
+        type: 'COMBAT_TRACKER_ACTIVE_CHARACTER',
+        payload: characters[0].id
+      });
       return await this.updateCombatTracker(accessToken, {
         activeCharacterId: characters[0].id
       });
@@ -322,6 +327,20 @@ export class SessionService {
       activeCharacterIndex = characters.length - 1;
       newRound = true;
     }
+    const round = newRound ? tracker.round - 1 : tracker.round;
+
+    this.broadcast({
+      sessionId: accessTokenParts(accessToken).sessionId,
+      type: 'COMBAT_TRACKER_ROUND',
+      payload: round
+    });
+
+    this.broadcast({
+      sessionId: accessTokenParts(accessToken).sessionId,
+      type: 'COMBAT_TRACKER_ACTIVE_CHARACTER',
+      payload: characters[activeCharacterIndex].id
+    });
+
     return await this.updateCombatTracker(accessToken, {
       activeCharacterId: characters[activeCharacterIndex].id,
       round: Math.max(newRound ? tracker.round - 1 : tracker.round, 0)
