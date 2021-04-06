@@ -11,4 +11,8 @@ export interface SessionSchema {
   users: SessionUserSchema[];
   activeScreen: ActiveScreen;
   combatTracker?: CombatTrackerSchema;
+  quickJoin: {
+    admin: string;
+    display: string;
+  };
 }

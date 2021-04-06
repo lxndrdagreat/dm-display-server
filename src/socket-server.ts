@@ -94,16 +94,23 @@ async function handleConnectToSession(
   payload: Record<string, string | number>
 ): Promise<void> {
   // TODO: wrap to catch errors
-  const user = await sessionService.joinSession(
-    payload.sessionId as string,
-    payload.password as string,
-    payload.role as number
-  );
-  const token = createAccessToken(
-    payload.sessionId as string,
-    user.id,
-    user.role
-  );
+  let user;
+  let sessionId;
+  if (payload.quick) {
+    const info = await sessionService.joinSessionWithQuickUID(
+      payload.quick as string
+    );
+    user = info[1];
+    sessionId = info[0].id;
+  } else {
+    user = await sessionService.joinSession(
+      payload.sessionId as string,
+      payload.password as string,
+      payload.role as number
+    );
+    sessionId = payload.sessionId as string;
+  }
+  const token = createAccessToken(sessionId, user.id, user.role);
   const session = await sessionService.getSessionByToken(token);
   await connectSocketWithTokenAndSession(socket, token, session);
 }
@@ -118,9 +125,14 @@ async function connectSocketWithTokenAndSession(
   const list = socketsBySession.get(session.id) || [];
   list.push(socket);
   socketsBySession.set(session.id, list);
+  const parts = accessTokenParts(token);
   await send(socket, {
     type: SocketMessageType.SessionConnected,
-    payload: token
+    payload: {
+      token: token,
+      role: parts.userRole,
+      session: parts.sessionId
+    }
   });
 
   await send(socket, {
@@ -128,7 +140,8 @@ async function connectSocketWithTokenAndSession(
     payload: {
       id: session.id,
       activeScreen: session.activeScreen,
-      combatTracker: session.combatTracker
+      combatTracker: session.combatTracker,
+      quickJoin: session.quickJoin
     }
   });
 }

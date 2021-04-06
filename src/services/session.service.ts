@@ -1,6 +1,6 @@
 import { SessionBroadcast } from '../schemas/session-broadcast.schema';
 import { ActiveScreen, SessionSchema } from '../schemas/session.schema';
-import { nextUID } from './uid-service';
+import { nextLongUID, nextUID } from './uid-service';
 import {
   CombatTrackerSchema,
   initCombatTrackerState
@@ -90,6 +90,8 @@ export class SessionService {
   async createSession(password: string): Promise<Readonly<SessionSchema>> {
     const sessionId = nextUID();
 
+    // TODO: require password strength
+
     const session: SessionSchema = {
       id: sessionId,
       // TODO: hash this password
@@ -97,7 +99,11 @@ export class SessionService {
       // TODO: include initial admin user
       users: [],
       activeScreen: ActiveScreen.CombatTracker,
-      combatTracker: initCombatTrackerState()
+      combatTracker: initCombatTrackerState(),
+      quickJoin: {
+        admin: nextLongUID(),
+        display: nextLongUID()
+      }
     };
 
     this.sessionDb.set(sessionId, session);
@@ -122,6 +128,28 @@ export class SessionService {
     };
     session.users.push(user);
     return user;
+  }
+
+  async joinSessionWithQuickUID(
+    quickUID: string
+  ): Promise<Readonly<[session: SessionSchema, user: SessionUserSchema]>> {
+    // find session
+    const session = Array.from(this.sessionDb.values()).find(
+      (ses) =>
+        ses.quickJoin.display === quickUID || ses.quickJoin.admin === quickUID
+    );
+    if (!session) {
+      throw new SessionNotFoundError();
+    }
+    const user: SessionUserSchema = {
+      id: nextUID(),
+      role:
+        quickUID === session.quickJoin.admin
+          ? SessionUserRole.Admin
+          : SessionUserRole.Display
+    };
+    session.users.push(user);
+    return [session, user];
   }
 
   async getUserForSession(
