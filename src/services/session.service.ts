@@ -352,8 +352,12 @@ export class SessionService {
     let newRound = false;
     activeCharacterIndex -= 1;
     if (activeCharacterIndex < 0) {
-      activeCharacterIndex = characters.length - 1;
-      newRound = true;
+      if (tracker.round > 1) {
+        activeCharacterIndex = characters.length - 1;
+        newRound = true;
+      } else {
+        activeCharacterIndex = 0;
+      }
     }
     const round = newRound ? tracker.round - 1 : tracker.round;
 
