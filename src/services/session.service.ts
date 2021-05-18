@@ -279,7 +279,7 @@ export class SessionService {
       // do nothing
       return tracker;
     }
-    const characters = tracker.characters.slice();
+    const characters = tracker.characters.filter((ch) => ch.active);
     // sort by initiative roll high-to-low
     characters.sort((a, b) => b.roll - a.roll);
 
@@ -333,7 +333,7 @@ export class SessionService {
       // do nothing
       return tracker;
     }
-    const characters = tracker.characters.slice();
+    const characters = tracker.characters.filter((ch) => ch.active);
     // sort by initiative roll
     characters.sort((a, b) => b.roll - a.roll);
     if (!tracker.activeCharacterId) {
