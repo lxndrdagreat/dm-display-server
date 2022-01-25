@@ -478,5 +478,10 @@ export function createSocketServer(
     }
   });
 
+  // 60 fps
+  setInterval(() => {
+    sessionService.pumpQueue();
+  }, 16);
+
   return wss;
 }

@@ -49,6 +49,7 @@ export class SessionService {
   private subscribers: SessionBroadcastSubscriberFunction[] = [];
   // Using an in-memory store for now
   private sessionDb = new Map<string, SessionSchema>();
+  private commandQueue: (() => Promise<void>)[] = [];
 
   subscribe(sub: SessionBroadcastSubscriberFunction): UnsubscribeFunction {
     if (this.subscribers.includes(sub)) {
@@ -85,6 +86,16 @@ export class SessionService {
       throw new SessionNotFoundError();
     }
     return session;
+  }
+
+  async pumpQueue(): Promise<void> {
+    if (this.commandQueue.length === 0) {
+      return;
+    }
+    while (this.commandQueue.length > 0) {
+      const commandFunc = this.commandQueue.shift()!;
+      await commandFunc();
+    }
   }
 
   async createSession(password: string): Promise<Readonly<SessionSchema>> {
@@ -238,144 +249,170 @@ export class SessionService {
     accessToken: SessionAccessToken,
     state?: CombatTrackerSchema
   ): Promise<Readonly<CombatTrackerSchema>> {
-    const newTracker = await this.updateCombatTracker(
-      accessToken,
-      state ?? initCombatTrackerState()
-    );
-    this.broadcast({
-      type: 'COMBAT_TRACKER',
-      sessionId: accessTokenParts(accessToken).sessionId,
-      payload: newTracker
+    return new Promise((resolve) => {
+      this.commandQueue.push(async () => {
+        const newTracker = await this.updateCombatTracker(
+          accessToken,
+          state ?? initCombatTrackerState()
+        );
+        this.broadcast({
+          type: 'COMBAT_TRACKER',
+          sessionId: accessTokenParts(accessToken).sessionId,
+          payload: newTracker
+        });
+        resolve(newTracker);
+      });
     });
-    return newTracker;
   }
 
   async restartCombatRounds(
     accessToken: SessionAccessToken
   ): Promise<Readonly<CombatTrackerSchema>> {
-    const tracker = await this.getCombatTrackerForSession(accessToken);
-    const characters = tracker.characters.slice();
-    characters.sort((a, b) => b.roll - a.roll);
+    return new Promise((resolve) => {
+      this.commandQueue.push(async () => {
+        const tracker = await this.getCombatTrackerForSession(accessToken);
+        const characters = tracker.characters.slice();
+        characters.sort((a, b) => b.roll - a.roll);
 
-    const updatedTracker = await this.updateCombatTracker(accessToken, {
-      round: 1,
-      activeCharacterId: characters.length > 0 ? characters[0].id : null
+        const updatedTracker = await this.updateCombatTracker(accessToken, {
+          round: 1,
+          activeCharacterId: characters.length > 0 ? characters[0].id : null
+        });
+
+        this.broadcast({
+          type: 'COMBAT_TRACKER',
+          sessionId: accessTokenParts(accessToken).sessionId,
+          payload: updatedTracker
+        });
+
+        resolve(updatedTracker);
+      });
     });
-
-    this.broadcast({
-      type: 'COMBAT_TRACKER',
-      sessionId: accessTokenParts(accessToken).sessionId,
-      payload: updatedTracker
-    });
-
-    return updatedTracker;
   }
 
   async nextTurn(
     accessToken: SessionAccessToken
   ): Promise<Readonly<CombatTrackerSchema>> {
-    const tracker = await this.getCombatTrackerForSession(accessToken);
-    if (tracker.characters.length === 0) {
-      // do nothing
-      return tracker;
-    }
-    const characters = tracker.characters.filter((ch) => ch.active);
-    // sort by initiative roll high-to-low
-    characters.sort((a, b) => b.roll - a.roll);
+    return new Promise((resolve) => {
+      this.commandQueue.push(async () => {
+        const tracker = await this.getCombatTrackerForSession(accessToken);
+        if (tracker.characters.length === 0) {
+          // do nothing
+          resolve(tracker);
+          return;
+        }
+        const characters = tracker.characters.filter((ch) => ch.active);
+        // sort by initiative roll high-to-low
+        characters.sort((a, b) => b.roll - a.roll);
 
-    // no active character, so start with the 1st one
-    if (!tracker.activeCharacterId) {
-      this.broadcast({
-        sessionId: accessTokenParts(accessToken).sessionId,
-        type: 'COMBAT_TRACKER_ACTIVE_CHARACTER',
-        payload: characters[0].id
+        // no active character, so start with the 1st one
+        if (!tracker.activeCharacterId) {
+          this.broadcast({
+            sessionId: accessTokenParts(accessToken).sessionId,
+            type: 'COMBAT_TRACKER_ACTIVE_CHARACTER',
+            payload: characters[0].id
+          });
+
+          resolve(
+            await this.updateCombatTracker(accessToken, {
+              activeCharacterId: characters[0].id
+            })
+          );
+          return;
+        }
+
+        let activeCharacterIndex = characters.findIndex(
+          (character) => character.id === tracker.activeCharacterId
+        );
+        let newRound = false;
+        activeCharacterIndex += 1;
+        if (activeCharacterIndex >= characters.length) {
+          activeCharacterIndex = 0;
+          newRound = true;
+        }
+        const round = newRound ? tracker.round + 1 : tracker.round;
+
+        this.broadcast({
+          sessionId: accessTokenParts(accessToken).sessionId,
+          type: 'COMBAT_TRACKER_ROUND',
+          payload: round
+        });
+
+        this.broadcast({
+          sessionId: accessTokenParts(accessToken).sessionId,
+          type: 'COMBAT_TRACKER_ACTIVE_CHARACTER',
+          payload: characters[activeCharacterIndex].id
+        });
+
+        resolve(
+          await this.updateCombatTracker(accessToken, {
+            activeCharacterId: characters[activeCharacterIndex].id,
+            round: round
+          })
+        );
       });
-
-      return await this.updateCombatTracker(accessToken, {
-        activeCharacterId: characters[0].id
-      });
-    }
-
-    let activeCharacterIndex = characters.findIndex(
-      (character) => character.id === tracker.activeCharacterId
-    );
-    let newRound = false;
-    activeCharacterIndex += 1;
-    if (activeCharacterIndex >= characters.length) {
-      activeCharacterIndex = 0;
-      newRound = true;
-    }
-    const round = newRound ? tracker.round + 1 : tracker.round;
-
-    this.broadcast({
-      sessionId: accessTokenParts(accessToken).sessionId,
-      type: 'COMBAT_TRACKER_ROUND',
-      payload: round
-    });
-
-    this.broadcast({
-      sessionId: accessTokenParts(accessToken).sessionId,
-      type: 'COMBAT_TRACKER_ACTIVE_CHARACTER',
-      payload: characters[activeCharacterIndex].id
-    });
-
-    return await this.updateCombatTracker(accessToken, {
-      activeCharacterId: characters[activeCharacterIndex].id,
-      round: round
     });
   }
 
   async previousTurn(
     accessToken: SessionAccessToken
   ): Promise<Readonly<CombatTrackerSchema>> {
-    const tracker = await this.getCombatTrackerForSession(accessToken);
-    if (tracker.characters.length === 0) {
-      // do nothing
-      return tracker;
-    }
-    const characters = tracker.characters.filter((ch) => ch.active);
-    // sort by initiative roll
-    characters.sort((a, b) => b.roll - a.roll);
-    if (!tracker.activeCharacterId) {
-      this.broadcast({
-        sessionId: accessTokenParts(accessToken).sessionId,
-        type: 'COMBAT_TRACKER_ACTIVE_CHARACTER',
-        payload: characters[0].id
+    return new Promise((resolve) => {
+      this.commandQueue.push(async () => {
+        const tracker = await this.getCombatTrackerForSession(accessToken);
+        if (tracker.characters.length === 0) {
+          // do nothing
+          return resolve(tracker);
+        }
+        const characters = tracker.characters.filter((ch) => ch.active);
+        // sort by initiative roll
+        characters.sort((a, b) => b.roll - a.roll);
+        if (!tracker.activeCharacterId) {
+          this.broadcast({
+            sessionId: accessTokenParts(accessToken).sessionId,
+            type: 'COMBAT_TRACKER_ACTIVE_CHARACTER',
+            payload: characters[0].id
+          });
+          return resolve(
+            await this.updateCombatTracker(accessToken, {
+              activeCharacterId: characters[0].id
+            })
+          );
+        }
+        let activeCharacterIndex = characters.findIndex(
+          (character) => character.id === tracker.activeCharacterId
+        );
+        let newRound = false;
+        activeCharacterIndex -= 1;
+        if (activeCharacterIndex < 0) {
+          if (tracker.round > 1) {
+            activeCharacterIndex = characters.length - 1;
+            newRound = true;
+          } else {
+            activeCharacterIndex = 0;
+          }
+        }
+        const round = newRound ? tracker.round - 1 : tracker.round;
+
+        this.broadcast({
+          sessionId: accessTokenParts(accessToken).sessionId,
+          type: 'COMBAT_TRACKER_ROUND',
+          payload: round
+        });
+
+        this.broadcast({
+          sessionId: accessTokenParts(accessToken).sessionId,
+          type: 'COMBAT_TRACKER_ACTIVE_CHARACTER',
+          payload: characters[activeCharacterIndex].id
+        });
+
+        return resolve(
+          await this.updateCombatTracker(accessToken, {
+            activeCharacterId: characters[activeCharacterIndex].id,
+            round: Math.max(newRound ? tracker.round - 1 : tracker.round, 0)
+          })
+        );
       });
-      return await this.updateCombatTracker(accessToken, {
-        activeCharacterId: characters[0].id
-      });
-    }
-    let activeCharacterIndex = characters.findIndex(
-      (character) => character.id === tracker.activeCharacterId
-    );
-    let newRound = false;
-    activeCharacterIndex -= 1;
-    if (activeCharacterIndex < 0) {
-      if (tracker.round > 1) {
-        activeCharacterIndex = characters.length - 1;
-        newRound = true;
-      } else {
-        activeCharacterIndex = 0;
-      }
-    }
-    const round = newRound ? tracker.round - 1 : tracker.round;
-
-    this.broadcast({
-      sessionId: accessTokenParts(accessToken).sessionId,
-      type: 'COMBAT_TRACKER_ROUND',
-      payload: round
-    });
-
-    this.broadcast({
-      sessionId: accessTokenParts(accessToken).sessionId,
-      type: 'COMBAT_TRACKER_ACTIVE_CHARACTER',
-      payload: characters[activeCharacterIndex].id
-    });
-
-    return await this.updateCombatTracker(accessToken, {
-      activeCharacterId: characters[activeCharacterIndex].id,
-      round: Math.max(newRound ? tracker.round - 1 : tracker.round, 0)
     });
   }
 
@@ -384,34 +421,38 @@ export class SessionService {
     characterId: string,
     characterUpdate: Partial<CombatCharacterSchema>
   ): Promise<Readonly<CombatCharacterSchema>> {
-    const tracker = await this.getCombatTrackerForSession(accessToken);
-    const characterIndex = tracker.characters.findIndex(
-      (character) => character.id === characterId
-    );
-    if (characterIndex < 0) {
-      throw new CombatCharacterDoesNotExist();
-    }
-    const updatedCharacter: CombatCharacterSchema = {
-      ...tracker.characters[characterIndex],
-      ...characterUpdate
-    };
-
-    await this.updateCombatTracker(accessToken, {
-      characters: tracker.characters.map((character) => {
-        if (character.id === characterId) {
-          return updatedCharacter;
+    return new Promise((resolve) => {
+      this.commandQueue.push(async () => {
+        const tracker = await this.getCombatTrackerForSession(accessToken);
+        const characterIndex = tracker.characters.findIndex(
+          (character) => character.id === characterId
+        );
+        if (characterIndex < 0) {
+          throw new CombatCharacterDoesNotExist();
         }
-        return character;
-      })
-    });
+        const updatedCharacter: CombatCharacterSchema = {
+          ...tracker.characters[characterIndex],
+          ...characterUpdate
+        };
 
-    this.broadcast({
-      sessionId: accessTokenParts(accessToken).sessionId,
-      type: 'CHARACTER',
-      payload: updatedCharacter
-    });
+        await this.updateCombatTracker(accessToken, {
+          characters: tracker.characters.map((character) => {
+            if (character.id === characterId) {
+              return updatedCharacter;
+            }
+            return character;
+          })
+        });
 
-    return updatedCharacter;
+        this.broadcast({
+          sessionId: accessTokenParts(accessToken).sessionId,
+          type: 'CHARACTER',
+          payload: updatedCharacter
+        });
+
+        resolve(updatedCharacter);
+      });
+    });
   }
 
   async updateCharacterNPCBlock(
@@ -419,27 +460,33 @@ export class SessionService {
     characterId: string,
     npcDetails: Partial<NPCDetails>
   ): Promise<Readonly<CombatCharacterSchema>> {
-    const tracker = await this.getCombatTrackerForSession(accessToken);
-    const characterIndex = tracker.characters.findIndex(
-      (character) => character.id === characterId
-    );
-    if (characterIndex < 0) {
-      throw new CombatCharacterDoesNotExist();
-    }
-    const details: NPCDetails = tracker.characters[characterIndex].npc || {
-      url: '',
-      maxHealth: 0,
-      health: 0,
-      armorClass: 0,
-      attacks: []
-    };
+    return new Promise((resolve) => {
+      this.commandQueue.push(async () => {
+        const tracker = await this.getCombatTrackerForSession(accessToken);
+        const characterIndex = tracker.characters.findIndex(
+          (character) => character.id === characterId
+        );
+        if (characterIndex < 0) {
+          throw new CombatCharacterDoesNotExist();
+        }
+        const details: NPCDetails = tracker.characters[characterIndex].npc || {
+          url: '',
+          maxHealth: 0,
+          health: 0,
+          armorClass: 0,
+          attacks: []
+        };
 
-    return this.updateCharacter(accessToken, characterId, {
-      ...tracker.characters[characterIndex],
-      npc: {
-        ...details,
-        ...npcDetails
-      }
+        return resolve(
+          this.updateCharacter(accessToken, characterId, {
+            ...tracker.characters[characterIndex],
+            npc: {
+              ...details,
+              ...npcDetails
+            }
+          })
+        );
+      });
     });
   }
 
@@ -447,75 +494,85 @@ export class SessionService {
     accessToken: SessionAccessToken,
     character: Omit<CombatCharacterSchema, 'id'>
   ): Promise<Readonly<CombatCharacterSchema>> {
-    const tracker = await this.getCombatTrackerForSession(accessToken);
-    // TODO: validate character model
-    const newCharacter: CombatCharacterSchema = {
-      ...character,
-      id: nextUID(),
-      conditions: []
-    };
+    return new Promise((resolve) => {
+      this.commandQueue.push(async () => {
+        const tracker = await this.getCombatTrackerForSession(accessToken);
+        // TODO: validate character model
+        const newCharacter: CombatCharacterSchema = {
+          ...character,
+          id: nextUID(),
+          conditions: []
+        };
 
-    const characters = tracker.characters.slice();
-    characters.push(newCharacter);
-    characters.sort((a, b) => b.roll - a.roll);
+        const characters = tracker.characters.slice();
+        characters.push(newCharacter);
+        characters.sort((a, b) => b.roll - a.roll);
 
-    // TODO: if that was the 1st character added, make them the active character
+        // TODO: if that was the 1st character added, make them the active character
 
-    await this.updateCombatTracker(accessToken, {
-      characters: characters
+        await this.updateCombatTracker(accessToken, {
+          characters: characters
+        });
+
+        this.broadcast({
+          sessionId: accessTokenParts(accessToken).sessionId,
+          type: 'CHARACTER_ADD',
+          payload: newCharacter
+        });
+
+        return resolve(newCharacter);
+      });
     });
-
-    this.broadcast({
-      sessionId: accessTokenParts(accessToken).sessionId,
-      type: 'CHARACTER_ADD',
-      payload: newCharacter
-    });
-
-    return newCharacter;
   }
 
   async removeCharacter(
     accessToken: SessionAccessToken,
     characterId: string
   ): Promise<Readonly<CombatTrackerSchema>> {
-    const tracker = await this.getCombatTrackerForSession(accessToken);
-    const index = tracker.characters.findIndex(
-      (character) => character.id === characterId
-    );
-    if (index < 0) {
-      throw new CombatCharacterDoesNotExist();
-    }
-    const characters = tracker.characters.slice();
-    characters.splice(index, 1);
-
-    this.broadcast({
-      sessionId: accessTokenParts(accessToken).sessionId,
-      type: 'CHARACTER_REMOVE',
-      payload: characterId
-    });
-
-    // if that character was the active character, set the next active character
-    let activeCharacter = tracker.activeCharacterId;
-    if (characterId === activeCharacter) {
-      if (index >= characters.length) {
-        if (characters.length > 0) {
-          activeCharacter = characters[0].id;
-        } else {
-          activeCharacter = null;
+    return new Promise((resolve) => {
+      this.commandQueue.push(async () => {
+        const tracker = await this.getCombatTrackerForSession(accessToken);
+        const index = tracker.characters.findIndex(
+          (character) => character.id === characterId
+        );
+        if (index < 0) {
+          throw new CombatCharacterDoesNotExist();
         }
-      } else {
-        activeCharacter = characters[index].id;
-      }
-      this.broadcast({
-        sessionId: accessTokenParts(accessToken).sessionId,
-        type: 'COMBAT_TRACKER_ACTIVE_CHARACTER',
-        payload: activeCharacter
-      });
-    }
+        const characters = tracker.characters.slice();
+        characters.splice(index, 1);
 
-    return await this.updateCombatTracker(accessToken, {
-      characters: characters,
-      activeCharacterId: activeCharacter
+        this.broadcast({
+          sessionId: accessTokenParts(accessToken).sessionId,
+          type: 'CHARACTER_REMOVE',
+          payload: characterId
+        });
+
+        // if that character was the active character, set the next active character
+        let activeCharacter = tracker.activeCharacterId;
+        if (characterId === activeCharacter) {
+          if (index >= characters.length) {
+            if (characters.length > 0) {
+              activeCharacter = characters[0].id;
+            } else {
+              activeCharacter = null;
+            }
+          } else {
+            activeCharacter = characters[index].id;
+          }
+          this.broadcast({
+            sessionId: accessTokenParts(accessToken).sessionId,
+            type: 'COMBAT_TRACKER_ACTIVE_CHARACTER',
+            payload: activeCharacter
+          });
+        }
+
+        return resolve(
+          await this.updateCombatTracker(accessToken, {
+            characters: characters,
+            activeCharacterId: activeCharacter
+          })
+        );
+      });
     });
   }
 }
